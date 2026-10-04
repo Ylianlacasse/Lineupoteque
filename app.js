@@ -11,6 +11,7 @@ idb.catch(()=>{});
 const tx=(mode,fn)=>idb.then(d=>new Promise((res,rej)=>{const t=d.transaction("l",mode),r=fn(t.objectStore("l"));t.oncomplete=()=>res(r.result);t.onerror=t.onabort=()=>rej(t.error)}));
 const persist=async l=>{try{await tx("readwrite",s=>s.put(l));return true}catch(e){warn("Stockage impossible : cette lineup ne sera pas conservée après fermeture. Exporte tes données.");return false}};
 const norm=x=>{if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
+const parseTimer=v=>{v=v.trim();if(!v)return"";const m=v.match(/^(?:(\d{1,2})[:.])?(\d{1,2})$/);if(!m)return null;const s=+m[2];if(m[1]!==undefined&&s>59)return null;const t=(+m[1]||0)*60+s;return Math.floor(t/60)+":"+String(t%60).padStart(2,"0")};
 const ts=l=>l.ts||parseInt(l.id,36)||0;
 
 async function init(){
@@ -45,6 +46,7 @@ function card(l){
  b.appendChild(el("span","b t",l.type));
  l.agents.forEach(a=>{const x=el("span","b",a);x.style.color=x.style.borderColor=AGENT_COLORS[a];b.appendChild(x)});
  b.appendChild(el("span","b",l.map+" · "+l.site));
+ if(l.timer)b.appendChild(el("span","b","Timer "+l.timer));
  b.appendChild(el("span","b"+(l.jump?" j":""),l.jump?"Jump Boost":"Sans Jump Boost"));
  c.appendChild(b);
  if(l.imgs.length){const g=el("div","gal"+(l.imgs.length===1?" one":""));l.imgs.forEach((s,i)=>{const im=el("img");im.src=s;im.alt=l.title+" "+(i+1);im.onclick=()=>{$("lb").firstElementChild.src=s;$("lb").hidden=false};g.appendChild(im)});c.appendChild(g)}
@@ -79,7 +81,7 @@ function openForm(l){
  $("fTitle").value=l?l.title:"";$("eType").value=l?l.type:TYPES[0];
  document.querySelectorAll("#eAgents input").forEach(c=>c.checked=!!l&&l.agents.includes(c.value));
  $("eMap").value=l?l.map:MAPS[0];opts($("eSite"),SITES[$("eMap").value]);if(l)$("eSite").value=l.site;
- $("eJump").checked=!!l&&!!l.jump;$("eNote").value=l?l.note:"";$("eLink").value=l?l.link||"":"";
+ $("eJump").checked=!!l&&!!l.jump;$("eTimer").value=l?l.timer||"":"";$("eNote").value=l?l.note:"";$("eLink").value=l?l.link||"":"";
  $("dlg").showModal();
 }
 $("add").onclick=()=>openForm(null);
@@ -89,9 +91,11 @@ $("save").onclick=async()=>{
  const title=$("fTitle").value.trim();
  if(!title)return showErr("Ajoute un titre.");
  if(!agents.length)return showErr("Choisis au moins un agent.");
+ const timer=parseTimer($("eTimer").value);
+ if(timer===null)return showErr("Timer invalide : écris par exemple 1:20 ou 45.");
  if(pending)return showErr("Images en cours de traitement, réessaie dans un instant.");
  const old=data.find(x=>x.id===editId);
- const o={id:editId||Date.now().toString(36),ts:old?ts(old):Date.now(),title,type:$("eType").value,agents,map:$("eMap").value,site:$("eSite").value,jump:$("eJump").checked,note:$("eNote").value.trim(),link:$("eLink").value.trim(),imgs:imgs.slice()};
+ const o={id:editId||Date.now().toString(36),ts:old?ts(old):Date.now(),title,type:$("eType").value,agents,map:$("eMap").value,site:$("eSite").value,jump:$("eJump").checked,timer,note:$("eNote").value.trim(),link:$("eLink").value.trim(),imgs:imgs.slice()};
  data=editId?data.map(x=>x.id===editId?o:x):[o,...data];
  await persist(o);
  $("dlg").close();
