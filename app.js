@@ -14,25 +14,12 @@ $("eMap").onchange=()=>opts($("eSite"),SITES[$("eMap").value]);
 function save(){try{localStorage.setItem(KEY,JSON.stringify(data));return true}catch(e){alert("Stockage plein : retire des images ou exporte tes données.");return false}}
 
 function render(){
- const f={t:$("fType").value,a:$("fAgent").value,m:$("fMap").value,s:$("fSite").value,q:$("q").value.toLowerCase(),g:$("grp").value};
+ const f={t:$("fType").value,a:$("fAgent").value,m:$("fMap").value,s:$("fSite").value,q:$("q").value.toLowerCase()};
  const list=data.filter(l=>(!f.t||l.type===f.t)&&(!f.a||l.agents.includes(f.a))&&(!f.m||l.map===f.m)&&(!f.s||l.site===f.s)&&(!f.q||(l.title+" "+l.note).toLowerCase().includes(f.q)));
  const out=$("out");out.innerHTML="";
  if(!list.length){out.appendChild(el("div","empty",data.length?"Aucune lineup avec ces filtres.":"Aucune lineup pour l'instant. Clique sur « Ajouter une lineup »."));return}
- const ent=[];
- list.forEach(l=>{
-  if(f.g==="type")(f.a?[f.a]:l.agents).forEach(a=>ent.push([l.type,a,l]));
-  else ent.push([l.map,l.site,l]);
- });
- const o1=f.g==="type"?TYPES:MAPS,o2=f.g==="type"?AGENTS:["A","B","C"];
- const g={};ent.forEach(([a,b,l])=>{((g[a]=g[a]||{})[b]=g[a][b]||[]).push(l)});
- o1.filter(k=>g[k]).forEach(k1=>{
-  const n=Object.values(g[k1]).reduce((s,x)=>s+x.length,0);
-  out.appendChild(el("h2",null,k1+" ("+n+")"));
-  o2.filter(k=>g[k1][k]).forEach(k2=>{
-   const h=el("h3",null,f.g==="map"?"Site "+k2:k2);if(f.g==="type")h.style.color=AGENT_COLORS[k2];out.appendChild(h);
-   const gr=el("div","grid");g[k1][k2].forEach(l=>gr.appendChild(card(l)));out.appendChild(gr);
-  });
- });
+ out.appendChild(el("h3",null,list.length+(list.length>1?" lineups":" lineup")));
+ const gr=el("div","grid");list.forEach(l=>gr.appendChild(card(l)));out.appendChild(gr);
 }
 
 function card(l){
@@ -82,7 +69,7 @@ $("save").onclick=()=>{
  $("dlg").close();render();
 };
 
-["fType","fAgent","fMap","fSite","grp"].forEach(i=>$(i).onchange=render);
+["fType","fAgent","fMap","fSite"].forEach(i=>$(i).onchange=render);
 $("q").oninput=render;
 $("rst").onclick=()=>{["fType","fAgent","fMap","fSite"].forEach(i=>$(i).value="");$("q").value="";render()};
 $("exp").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:"application/json"}));a.download="lineups-valorant.json";a.click()};
