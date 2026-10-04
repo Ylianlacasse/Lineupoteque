@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lineups Valorant</title>
+<link rel="stylesheet" href="css/style.css">
+</head><body>
+<h1>Lineups Valorant</h1>
+
+<div class="bar">
+ <select id="fType"></select><select id="fAgent"></select>
+ <select id="fMap"></select><select id="fSite"></select>
+ <select id="grp"><option value="type">Grouper : type › agent</option><option value="map">Grouper : map › site</option></select>
+</div>
+<input id="q" placeholder="Rechercher un titre ou une note…">
+<div class="row">
+ <button class="p" id="add">+ Ajouter une lineup</button>
+ <button id="exp">Exporter</button>
+ <button id="imp">Importer</button>
+ <button id="rst">Réinitialiser filtres</button>
+ <input type="file" id="impf" accept=".json" hidden>
+</div>
+<div id="out"></div>
+
+<dialog id="dlg"><div>
+ <label>Titre</label><input id="fTitle" maxlength="80" placeholder="ex : Molly depuis le spawn vers Heaven">
+ <label>Type</label><select id="eType"></select>
+ <label>Agent(s)</label><div class="chips" id="eAgents"></div>
+ <label>Map</label><select id="eMap"></select>
+ <label>Site</label><select id="eSite"></select>
+ <label>Jump Boost</label>
+ <div class="chips"><label><input type="checkbox" id="eJump"> Nécessite un Jump Boost</label></div>
+ <label>Notes (position, visée, repères…)</label><textarea id="eNote" rows="4"></textarea>
+ <label>Lien (vidéo, optionnel)</label><input id="eLink" type="url" placeholder="https://…">
+ <label>Image (optionnel)</label><input id="eImg" type="file" accept="image/*">
+ <div class="row"><button class="p" id="save">Enregistrer</button><button id="cancel">Annuler</button></div>
+</div></dialog>
+<script src="js/data.js"></script>
+<script src="js/app.js"></script>
+</body></html>
