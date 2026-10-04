@@ -48,11 +48,11 @@ function card(l){
  b.appendChild(el("span","b t",l.type));
  l.agents.forEach(a=>{const x=el("span","b",a);x.style.color=x.style.borderColor=AGENT_COLORS[a];b.appendChild(x)});
  b.appendChild(el("span","b",l.map+" · "+l.site));
- if(l.timer)b.appendChild(el("span","b","Timer "+l.timer));
  b.appendChild(el("span","b"+(l.jump?" j":""),l.jump?"Jump Boost":"Sans Jump Boost"));
  c.appendChild(b);
  if(l.imgs.length){const g=el("div","gal"+(l.imgs.length===1?" one":""));l.imgs.forEach((s,i)=>{const im=el("img");im.src=s;im.alt=l.title+" "+(i+1);im.onclick=()=>{$("lb").firstElementChild.src=s;$("lb").hidden=false};g.appendChild(im)});c.appendChild(g)}
  if(l.note)c.appendChild(el("div","n",l.note));
+ if(l.timer)c.appendChild(el("div","tm","Timer : "+l.timer));
  if(/^https?:\/\//i.test(l.link||"")){const a=el("a",null,"Voir la vidéo / le lien");a.href=l.link;a.target="_blank";a.rel="noopener";c.appendChild(a)}
  const act=el("div","act");
  const e=el("button",null,"Modifier");e.onclick=()=>openForm(l);

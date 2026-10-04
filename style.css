@@ -39,3 +39,4 @@ label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
 .gal.one{grid-template-columns:1fr}.gal.one img{aspect-ratio:auto}
 #lb{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;z-index:9;padding:8px}
 #lb[hidden]{display:none}#lb img{max-width:100%;max-height:100%}
+.tm{font-size:13px;margin-top:4px}
