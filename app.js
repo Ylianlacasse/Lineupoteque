@@ -12,6 +12,8 @@ const tx=(mode,fn)=>idb.then(d=>new Promise((res,rej)=>{const t=d.transaction("l
 const persist=async l=>{try{await tx("readwrite",s=>s.put(l));return true}catch(e){warn("Stockage impossible : cette lineup ne sera pas conservée après fermeture. Exporte tes données.");return false}};
 const norm=x=>{if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
 const parseTimer=v=>{v=v.trim();if(!v)return"";const m=v.match(/^(?:(\d{1,2})[:.])?(\d{1,2})$/);if(!m)return null;const s=+m[2];if(m[1]!==undefined&&s>59)return null;const t=(+m[1]||0)*60+s;return Math.floor(t/60)+":"+String(t%60).padStart(2,"0")};
+const agKey=l=>[...l.agents].sort((a,b)=>a.localeCompare(b,"fr")).join(",");
+const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||a.site.localeCompare(b.site)||agKey(a).localeCompare(agKey(b),"fr")||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
 const ts=l=>l.ts||parseInt(l.id,36)||0;
 
 async function init(){
@@ -32,7 +34,7 @@ $("eMap").onchange=()=>opts($("eSite"),SITES[$("eMap").value]);
 
 function render(){
  const f={t:$("fType").value,a:$("fAgent").value,m:$("fMap").value,s:$("fSite").value,q:$("q").value.toLowerCase()};
- const list=data.filter(l=>(!f.t||l.type===f.t)&&(!f.a||l.agents.includes(f.a))&&(!f.m||l.map===f.m)&&(!f.s||l.site===f.s)&&(!f.q||(l.title+" "+l.note).toLowerCase().includes(f.q))).sort((a,b)=>ts(b)-ts(a));
+ const list=data.filter(l=>(!f.t||l.type===f.t)&&(!f.a||l.agents.includes(f.a))&&(!f.m||l.map===f.m)&&(!f.s||l.site===f.s)&&(!f.q||(l.title+" "+l.note).toLowerCase().includes(f.q))).sort(cmp);
  const out=$("out");out.innerHTML="";
  if(!list.length){out.appendChild(el("div","empty",data.length?"Aucune lineup avec ces filtres.":"Aucune lineup pour l'instant. Clique sur « Ajouter une lineup »."));return}
  out.appendChild(el("h3",null,list.length+(list.length>1?" lineups":" lineup")));
