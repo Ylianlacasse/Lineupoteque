@@ -10,8 +10,8 @@ const idb=new Promise((res,rej)=>{const r=indexedDB.open("lineupoteque",1);r.onu
 idb.catch(()=>{});
 const tx=(mode,fn)=>idb.then(d=>new Promise((res,rej)=>{const t=d.transaction("l",mode),r=fn(t.objectStore("l"));t.oncomplete=()=>res(r.result);t.onerror=t.onabort=()=>rej(t.error)}));
 const persist=async l=>{try{await tx("readwrite",s=>s.put(l));return true}catch(e){warn("Stockage impossible : cette lineup ne sera pas conservée après fermeture. Exporte tes données.");return false}};
-const norm=x=>{if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
-const parseTimer=v=>{v=v.trim();if(!v)return"";const m=v.match(/^(?:(\d{1,2})[:.])?(\d{1,2})$/);if(!m)return null;const s=+m[2];if(m[1]!==undefined&&s>59)return null;const t=(+m[1]||0)*60+s;return Math.floor(t/60)+":"+String(t%60).padStart(2,"0")};
+const norm=x=>{if(typeof x.timer==="string"){const m=x.timer.match(/^(\d+):(\d{2})$/);x.timer=m?+m[1]*60+(+m[2]):(parseInt(x.timer)||"")}if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
+const parseTimer=v=>{v=v.trim().replace(/s$/i,"");if(!v)return"";return/^\d{1,3}$/.test(v)?+v:null};
 const agKey=l=>[...l.agents].sort((a,b)=>a.localeCompare(b,"fr")).join(",");
 const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||a.site.localeCompare(b.site)||agKey(a).localeCompare(agKey(b),"fr")||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
 const ts=l=>l.ts||parseInt(l.id,36)||0;
@@ -52,7 +52,7 @@ function card(l){
  c.appendChild(b);
  if(l.imgs.length){const g=el("div","gal"+(l.imgs.length===1?" one":""));l.imgs.forEach((s,i)=>{const im=el("img");im.src=s;im.alt=l.title+" "+(i+1);im.onclick=()=>{$("lb").firstElementChild.src=s;$("lb").hidden=false};g.appendChild(im)});c.appendChild(g)}
  if(l.note)c.appendChild(el("div","n",l.note));
- if(l.timer)c.appendChild(el("div","tm","Timer : "+l.timer));
+ if(l.timer)c.appendChild(el("div","tm","Time : "+l.timer+"s"));
  if(/^https?:\/\//i.test(l.link||"")){const a=el("a",null,"Voir la vidéo / le lien");a.href=l.link;a.target="_blank";a.rel="noopener";c.appendChild(a)}
  const act=el("div","act");
  const e=el("button",null,"Modifier");e.onclick=()=>openForm(l);
@@ -94,7 +94,7 @@ $("save").onclick=async()=>{
  if(!title)return showErr("Ajoute un titre.");
  if(!agents.length)return showErr("Choisis au moins un agent.");
  const timer=parseTimer($("eTimer").value);
- if(timer===null)return showErr("Timer invalide : écris par exemple 1:20 ou 45.");
+ if(timer===null)return showErr("Time invalide : écris un nombre de secondes, par exemple 45.");
  if(pending)return showErr("Images en cours de traitement, réessaie dans un instant.");
  const old=data.find(x=>x.id===editId);
  const o={id:editId||Date.now().toString(36),ts:old?ts(old):Date.now(),title,type:$("eType").value,agents,map:$("eMap").value,site:$("eSite").value,jump:$("eJump").checked,timer,note:$("eNote").value.trim(),link:$("eLink").value.trim(),imgs:imgs.slice()};

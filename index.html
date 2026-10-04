@@ -2,7 +2,7 @@
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lineups Valorant</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head><body>
 <h1>Lineups Valorant</h1>
 
@@ -30,7 +30,7 @@
  <label>Site</label><select id="eSite"></select>
  <label>Jump Boost</label>
  <div class="chips"><label><input type="checkbox" id="eJump"> Nécessite un Jump Boost</label></div>
- <label>Timer (optionnel)</label><input id="eTimer" placeholder="ex : 1:20 ou 45" maxlength="5">
+ <label>Time en secondes (optionnel)</label><input id="eTimer" placeholder="ex : 45" inputmode="numeric" maxlength="4">
  <label>Notes (position, visée, repères…)</label><textarea id="eNote" rows="4"></textarea>
  <label>Lien (vidéo, optionnel)</label><input id="eLink" type="url" placeholder="https://…">
  <label>Images (optionnel, plusieurs possibles)</label>
@@ -39,6 +39,6 @@
  <div id="err" class="err"></div>
  <div class="row"><button class="p" id="save">Enregistrer</button><button id="cancel">Annuler</button></div>
 </div></dialog>
-<script src="data.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="data.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body></html>
