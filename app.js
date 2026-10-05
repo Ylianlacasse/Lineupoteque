@@ -13,7 +13,7 @@ const persist=async l=>{try{await tx("readwrite",s=>s.put(l));return true}catch(
 const norm=x=>{if(typeof x.timer==="string"){const m=x.timer.match(/^(\d+):(\d{2})$/);x.timer=m?+m[1]*60+(+m[2]):(parseInt(x.timer)||"")}if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
 const parseTimer=v=>{v=v.trim().replace(/s$/i,"");if(!v)return"";return/^\d{1,3}$/.test(v)?+v:null};
 const agKey=l=>[...l.agents].sort((a,b)=>a.localeCompare(b,"fr")).join(",");
-const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||a.site.localeCompare(b.site)||agKey(a).localeCompare(agKey(b),"fr")||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
+const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||agKey(a).localeCompare(agKey(b),"fr")||a.site.localeCompare(b.site)||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
 const ts=l=>l.ts||parseInt(l.id,36)||0;
 
 let sharedIds=new Set();
@@ -48,7 +48,11 @@ function render(){
  const out=$("out");out.innerHTML="";
  if(!list.length){out.appendChild(el("div","empty",data.length?"Aucune lineup avec ces filtres.":"Aucune lineup pour l'instant. Clique sur « Ajouter une lineup »."));return}
  out.appendChild(el("h3",null,list.length+(list.length>1?" lineups":" lineup")));
- const gr=el("div","grid");list.forEach(l=>gr.appendChild(card(l)));out.appendChild(gr);
+ let gr=null,cur=null; // une catégorie par map : agents (ordre alphabétique) puis sites
+ list.forEach(l=>{
+  if(l.map!==cur){cur=l.map;out.appendChild(el("h2",null,cur+" ("+list.filter(x=>x.map===cur).length+")"));gr=el("div","grid");out.appendChild(gr)}
+  gr.appendChild(card(l));
+ });
 }
 
 function card(l,big){
