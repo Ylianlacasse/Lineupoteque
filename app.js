@@ -16,13 +16,23 @@ const agKey=l=>[...l.agents].sort((a,b)=>a.localeCompare(b,"fr")).join(",");
 const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||a.site.localeCompare(b.site)||agKey(a).localeCompare(agKey(b),"fr")||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
 const ts=l=>l.ts||parseInt(l.id,36)||0;
 
+let sharedIds=new Set();
+async function loadShared(){ // lineups publiées dans le dépôt (lineups.json), communes à tous les appareils
+ const get=async o=>{const r=await fetch("lineups.json",o);if(!r.ok)throw 0;return r.json()};
+ let d;try{d=await get({cache:"no-cache"})}catch(_){try{d=await get({cache:"force-cache"})}catch(__){return[]}}
+ return Array.isArray(d)?d.filter(x=>x&&x.id&&TYPES.includes(x.type)&&Array.isArray(x.agents)).map(norm):[];
+}
 async function init(){
+ let loc=[];
  try{
-  data=(await tx("readonly",s=>s.getAll())).map(norm);
+  loc=await tx("readonly",s=>s.getAll());
   const old=JSON.parse(localStorage.getItem("valo_lineups")||"[]"); // ancien stockage
-  for(const l of old)if(!data.some(x=>x.id===l.id)){norm(l);if(await persist(l))data.push(l)}
+  for(const l of old)if(!loc.some(x=>x.id===l.id)){norm(l);if(await persist(l))loc.push(l)}
   if(old.length)localStorage.removeItem("valo_lineups");
- }catch(e){warn("Stockage indisponible : les lineups ne seront pas conservées après fermeture.")}
+ }catch(e){warn("Stockage indisponible : les modifications ne seront pas conservées après fermeture.")}
+ const shared=await loadShared();sharedIds=new Set(shared.map(x=>x.id));
+ const ids=new Set(loc.map(x=>x.id));
+ data=shared.filter(x=>!ids.has(x.id)).concat(loc.filter(x=>!x.deleted).map(norm)); // la version locale prime sur celle du dépôt
  render();
 }
 
@@ -56,7 +66,7 @@ function card(l){
  if(/^https?:\/\//i.test(l.link||"")){const a=el("a",null,"Voir la vidéo / le lien");a.href=l.link;a.target="_blank";a.rel="noopener";c.appendChild(a)}
  const act=el("div","act");
  const e=el("button",null,"Modifier");e.onclick=()=>openForm(l);
- const d=el("button",null,"Supprimer");d.onclick=async()=>{if(confirm("Supprimer cette lineup ?")){data=data.filter(x=>x.id!==l.id);try{await tx("readwrite",s=>s.delete(l.id))}catch(_){}render()}};
+ const d=el("button",null,"Supprimer");d.onclick=async()=>{if(confirm("Supprimer cette lineup ?")){data=data.filter(x=>x.id!==l.id);try{await tx("readwrite",s=>sharedIds.has(l.id)?s.put({id:l.id,deleted:true}):s.delete(l.id))}catch(_){}render()}};
  act.append(e,d);c.appendChild(act);return c;
 }
 $("lb").onclick=()=>$("lb").hidden=true;
@@ -109,7 +119,7 @@ $("save").onclick=async()=>{
 ["fType","fAgent","fMap","fSite"].forEach(i=>$(i).onchange=render);
 $("q").oninput=render;
 $("rst").onclick=()=>{["fType","fAgent","fMap","fSite"].forEach(i=>$(i).value="");$("q").value="";render()};
-$("exp").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:"application/json"}));a.download="lineups-valorant.json";a.click()};
+$("exp").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:"application/json"}));a.download="lineups.json";a.click()};
 $("imp").onclick=()=>$("impf").click();
 $("impf").onchange=e=>{
  const f=e.target.files[0];if(!f)return;const r=new FileReader();
