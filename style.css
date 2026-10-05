@@ -15,7 +15,7 @@ button.p{background:var(--ac);border-color:var(--ac);color:#fff}
 .card h4{margin:0 0 6px;font-size:15px}
 .card img{width:100%;border-radius:6px;margin:6px 0;cursor:pointer}
 .b{display:inline-block;font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 7px;margin:0 4px 4px 0;color:var(--mu)}
-.b.t{color:var(--ac);border-color:var(--ac)}
+.b.t{color:#111;border-color:transparent;font-weight:600}
 .b.j{color:#7ad37a;border-color:#7ad37a}
 .n{color:var(--mu);font-size:13px;white-space:pre-wrap}
 .card a{color:var(--ac);font-size:13px}
@@ -47,3 +47,7 @@ label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
 #dv[hidden]{display:none}
 .dvin{max-width:760px;margin:0 auto}
 .dvbar{position:sticky;top:0;text-align:right;padding:2px 0 8px;z-index:1}
+.vw{position:relative;margin:6px 0}
+.vid{width:100%;border-radius:6px;display:block;background:#000;max-height:60vh}
+.vw:not(.big)::after{content:"\25B6";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;background:rgba(0,0,0,.55);border-radius:50%;width:44px;height:44px;line-height:44px;text-align:center;pointer-events:none}
+#vinfo button{padding:2px 8px;font-size:12px;margin-left:6px}

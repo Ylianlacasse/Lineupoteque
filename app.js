@@ -3,14 +3,14 @@ const el=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=nu
 const opts=(s,list,first)=>{s.innerHTML="";if(first){const o=el("option",null,first);o.value="";s.appendChild(o)}list.forEach(v=>{const o=el("option",null,v);o.value=v;s.appendChild(o)})};
 const warn=m=>{$("warn").textContent=m||"";$("warn").hidden=!m};
 const showErr=m=>{$("err").textContent=m||""};
-let data=[],imgs=[],editId=null,pending=0;
+let data=[],imgs=[],vid=null,editId=null,pending=0;
 
 /* Stockage IndexedDB (beaucoup plus de place que localStorage) */
 const idb=new Promise((res,rej)=>{const r=indexedDB.open("lineupoteque",1);r.onupgradeneeded=()=>r.result.createObjectStore("l",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 idb.catch(()=>{});
 const tx=(mode,fn)=>idb.then(d=>new Promise((res,rej)=>{const t=d.transaction("l",mode),r=fn(t.objectStore("l"));t.oncomplete=()=>res(r.result);t.onerror=t.onabort=()=>rej(t.error)}));
 const persist=async l=>{try{await tx("readwrite",s=>s.put(l));return true}catch(e){warn("Stockage impossible : cette lineup ne sera pas conservée après fermeture. Exporte tes données.");return false}};
-const norm=x=>{if(typeof x.timer==="string"){const m=x.timer.match(/^(\d+):(\d{2})$/);x.timer=m?+m[1]*60+(+m[2]):(parseInt(x.timer)||"")}if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
+const norm=x=>{if(x.video&&!(x.video instanceof Blob))delete x.video;if(typeof x.timer==="string"){const m=x.timer.match(/^(\d+):(\d{2})$/);x.timer=m?+m[1]*60+(+m[2]):(parseInt(x.timer)||"")}if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
 const parseTimer=v=>{v=v.trim().replace(/s$/i,"");if(!v)return"";return/^\d{1,3}$/.test(v)?+v:null};
 const agKey=l=>[...l.agents].sort((a,b)=>a.localeCompare(b,"fr")).join(",");
 const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||agKey(a).localeCompare(agKey(b),"fr")||a.site.localeCompare(b.site)||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
@@ -38,7 +38,10 @@ async function init(){
 
 opts($("fType"),TYPES,"Type : tous");opts($("fAgent"),AGENTS,"Agent : tous");
 opts($("fMap"),MAPS,"Map : toutes");opts($("fSite"),["A","B","C"],"Site : tous");
-opts($("eType"),TYPES);opts($("eMap"),MAPS);
+TYPES.forEach(t=>{const l=el("label");const r=document.createElement("input");r.type="radio";r.name="etype";r.value=t;l.style.borderLeft="3px solid "+TYPE_COLORS[t];l.append(r,t);$("eType").appendChild(l)});
+const getType=()=>document.querySelector('input[name="etype"]:checked').value;
+const setType=t=>document.querySelectorAll('input[name="etype"]').forEach(r=>r.checked=r.value===t);
+opts($("eMap"),MAPS);
 AGENTS.forEach(a=>{const l=el("label");const c=document.createElement("input");c.type="checkbox";c.value=a;l.style.borderLeft="3px solid "+AGENT_COLORS[a];l.append(c,a);$("eAgents").appendChild(l)});
 $("eMap").onchange=()=>opts($("eSite"),SITES[$("eMap").value]);
 
@@ -55,19 +58,26 @@ function render(){
  });
 }
 
+const vurls=new Map(); // aperçu des vidéos : fichier local (stocké dans le navigateur) ou lien .mp4
+const isMp4=u=>/\.mp4(\?.*)?$/i.test(u||"");
+const vsrc=l=>{if(l.video instanceof Blob){const o=vurls.get(l.id);if(!o||o.b!==l.video)vurls.set(l.id,{b:l.video,u:URL.createObjectURL(l.video)});return vurls.get(l.id).u}return isMp4(l.link)?l.link:null};
 function card(l,big){
  const c=el("div","card"+(big?" big":""));const st=el("div","stripe");l.agents.forEach(a=>{const x=el("span");x.style.background=AGENT_COLORS[a];st.appendChild(x)});c.appendChild(st);
  c.appendChild(el("h4",null,l.title));
  const b=el("div");
- b.appendChild(el("span","b t",l.type));
+ const tb=el("span","b t",l.type);tb.style.background=TYPE_COLORS[l.type];b.appendChild(tb);
  l.agents.forEach(a=>{const x=el("span","b",a);x.style.color=x.style.borderColor=AGENT_COLORS[a];b.appendChild(x)});
  b.appendChild(el("span","b",l.map+" · "+l.site));
- b.appendChild(el("span","b"+(l.jump?" j":""),l.jump?"Jump Boost":"Sans Jump Boost"));
+ if(l.jump)b.appendChild(el("span","b j","Jump Boost"));
+ if(l.speed)b.appendChild(el("span","b j","Speed Boost"));
+ if(!l.jump&&!l.speed)b.appendChild(el("span","b","Sans bonus"));
  c.appendChild(b);
  if(l.imgs.length){const g=el("div","gal"+(big?" big":l.imgs.length===1?" one":""));l.imgs.forEach((s,i)=>{const im=el("img");im.src=s;im.alt=l.title+" "+(i+1);if(big)im.onclick=e=>{e.stopPropagation();$("lb").firstElementChild.src=s;$("lb").hidden=false};g.appendChild(im)});c.appendChild(g)}
+ const vs=vsrc(l);
+ if(vs){const w=el("div","vw"+(big?" big":""));const v=document.createElement("video");v.src=vs+"#t=0.1";v.preload="metadata";v.muted=true;v.playsInline=true;v.className="vid";if(big)v.controls=true;w.appendChild(v);c.appendChild(w)}
  if(l.note)c.appendChild(el("div","n",l.note));
  if(l.timer)c.appendChild(el("div","tm","Time : "+l.timer+"s"));
- if(/^https?:\/\//i.test(l.link||"")){const a=el("a",null,"Voir la vidéo / le lien");a.href=l.link;a.target="_blank";a.rel="noopener";a.onclick=e=>e.stopPropagation();c.appendChild(a)}
+ if(/^https?:\/\//i.test(l.link||"")&&!isMp4(l.link)){const a=el("a",null,"Voir la vidéo / le lien");a.href=l.link;a.target="_blank";a.rel="noopener";a.onclick=e=>e.stopPropagation();c.appendChild(a)}
  const act=el("div","act");
  const e=el("button",null,"Modifier");e.onclick=ev=>{ev.stopPropagation();closeDetail();openForm(l)};
  const d=el("button",null,"Supprimer");d.onclick=async ev=>{ev.stopPropagation();if(confirm("Supprimer cette lineup ?")){closeDetail();data=data.filter(x=>x.id!==l.id);try{await tx("readwrite",s=>sharedIds.has(l.id)?s.put({id:l.id,deleted:true}):s.delete(l.id))}catch(_){}render()}};
@@ -77,7 +87,7 @@ function card(l,big){
 }
 /* Vue agrandie d'une lineup */
 function openDetail(l){const b=$("dvc");b.innerHTML="";b.appendChild(card(l,true));$("dv").hidden=false;$("dv").scrollTop=0;document.body.style.overflow="hidden"}
-function closeDetail(){$("dv").hidden=true;document.body.style.overflow=""}
+function closeDetail(){$("dv").hidden=true;$("dvc").innerHTML="";document.body.style.overflow=""}
 $("dv").onclick=e=>{if(e.target.id==="dv"||e.target.id==="dvx"||e.target.className==="dvin")closeDetail()};
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!$("lb").hidden)$("lb").hidden=true;else if(!$("dv").hidden)closeDetail()}});
 $("lb").onclick=()=>$("lb").hidden=true;
@@ -99,12 +109,14 @@ $("drop").ondrop=e=>{e.preventDefault();$("drop").classList.remove("over");addFi
 $("dlg").addEventListener("paste",e=>{const fs=[...(e.clipboardData?e.clipboardData.files:[])];if(fs.length){e.preventDefault();addFiles(fs)}});
 
 /* Formulaire */
+function vinfo(){const t=$("vinfo");t.innerHTML="";if(!vid)return;t.append((vid.name||"vidéo")+" · "+(vid.size/1048576).toFixed(1)+" Mo · stockée sur cet appareil uniquement ");const x=el("button",null,"Retirer");x.type="button";x.onclick=()=>{vid=null;vinfo()};t.appendChild(x)}
+$("eVid").onchange=e=>{const f=e.target.files[0];e.target.value="";if(!f)return;if(!/mp4/i.test(f.type)&&!/\.mp4$/i.test(f.name))return showErr("Choisis un fichier .mp4.");if(f.size>80*1048576)return showErr("Vidéo trop lourde (80 Mo max).");showErr("");vid=f;vinfo()};
 function openForm(l){
  editId=l?l.id:null;imgs=l?l.imgs.slice():[];showErr("");thumbs();
- $("fTitle").value=l?l.title:"";$("eType").value=l?l.type:TYPES[0];
+ $("fTitle").value=l?l.title:"";setType(l?l.type:TYPES[0]);
  document.querySelectorAll("#eAgents input").forEach(c=>c.checked=!!l&&l.agents.includes(c.value));
  $("eMap").value=l?l.map:MAPS[0];opts($("eSite"),SITES[$("eMap").value]);if(l)$("eSite").value=l.site;
- $("eJump").checked=!!l&&!!l.jump;$("eTimer").value=l?l.timer||"":"";$("eNote").value=l?l.note:"";$("eLink").value=l?l.link||"":"";
+ $("eJump").checked=!!l&&!!l.jump;$("eSpeed").checked=!!l&&!!l.speed;vid=l&&l.video instanceof Blob?l.video:null;vinfo();$("eTimer").value=l?l.timer||"":"";$("eNote").value=l?l.note:"";$("eLink").value=l?l.link||"":"";
  $("dlg").showModal();
 }
 $("add").onclick=()=>openForm(null);
@@ -118,7 +130,7 @@ $("save").onclick=async()=>{
  if(timer===null)return showErr("Time invalide : écris un nombre de secondes, par exemple 45.");
  if(pending)return showErr("Images en cours de traitement, réessaie dans un instant.");
  const old=data.find(x=>x.id===editId);
- const o={id:editId||Date.now().toString(36),ts:old?ts(old):Date.now(),title,type:$("eType").value,agents,map:$("eMap").value,site:$("eSite").value,jump:$("eJump").checked,timer,note:$("eNote").value.trim(),link:$("eLink").value.trim(),imgs:imgs.slice()};
+ const o={id:editId||Date.now().toString(36),ts:old?ts(old):Date.now(),title,type:getType(),agents,map:$("eMap").value,site:$("eSite").value,jump:$("eJump").checked,speed:$("eSpeed").checked,video:vid,timer,note:$("eNote").value.trim(),link:$("eLink").value.trim(),imgs:imgs.slice()};
  data=editId?data.map(x=>x.id===editId?o:x):[o,...data];
  await persist(o);
  $("dlg").close();
@@ -130,7 +142,7 @@ $("save").onclick=async()=>{
 ["fType","fAgent","fMap","fSite"].forEach(i=>$(i).onchange=render);
 $("q").oninput=render;
 $("rst").onclick=()=>{["fType","fAgent","fMap","fSite"].forEach(i=>$(i).value="");$("q").value="";render()};
-$("exp").onclick=()=>{const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data)],{type:"application/json"}));a.download="lineups.json";a.click()};
+$("exp").onclick=()=>{if(data.some(l=>l.video))alert("Les vidéos importées depuis cet appareil ne sont pas incluses dans l'export. Pour les partager, mets le .mp4 dans le dossier videos/ du dépôt et écris son chemin (videos/nom.mp4) dans le champ Lien.");const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,(k,v)=>v instanceof Blob?undefined:v)],{type:"application/json"}));a.download="lineups.json";a.click()};
 $("imp").onclick=()=>$("impf").click();
 $("impf").onchange=e=>{
  const f=e.target.files[0];if(!f)return;const r=new FileReader();
