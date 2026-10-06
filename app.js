@@ -9,20 +9,24 @@ let data=[],imgs=[],vid=null,editId=null,pending=0;
 const idb=new Promise((res,rej)=>{const r=indexedDB.open("lineupoteque",1);r.onupgradeneeded=()=>r.result.createObjectStore("l",{keyPath:"id"});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
 idb.catch(()=>{});
 const tx=(mode,fn)=>idb.then(d=>new Promise((res,rej)=>{const t=d.transaction("l",mode),r=fn(t.objectStore("l"));t.oncomplete=()=>res(r.result);t.onerror=t.onabort=()=>rej(t.error)}));
-const persist=async l=>{try{await tx("readwrite",s=>s.put(l));return true}catch(e){warn("Stockage impossible : cette lineup ne sera pas conservée après fermeture. Exporte tes données.");return false}};
+const newRev=()=>Date.now()+"."+Math.random().toString(36).slice(2);
+const isPend=r=>r.deleted||r.synced===undefined||r.synced!==r.rev;
+const persist=async l=>{l.rev=newRev();try{await tx("readwrite",s=>s.put(l));return true}catch(e){warn("Stockage impossible : cette lineup ne sera pas conservée après fermeture. Exporte tes données.");return false}};
 const norm=x=>{if(x.video&&!(x.video instanceof Blob))delete x.video;if(typeof x.timer==="string"){const m=x.timer.match(/^(\d+):(\d{2})$/);x.timer=m?+m[1]*60+(+m[2]):(parseInt(x.timer)||"")}if(x.img){x.imgs=(x.imgs||[]).concat(x.img);delete x.img}x.imgs=x.imgs||[];return x};
 const parseTimer=v=>{v=v.trim().replace(/s$/i,"");if(!v)return"";return/^\d{1,3}$/.test(v)?+v:null};
 const agKey=l=>[...l.agents].sort((a,b)=>a.localeCompare(b,"fr")).join(",");
 const cmp=(a,b)=>a.map.localeCompare(b.map,"fr")||agKey(a).localeCompare(agKey(b),"fr")||a.site.localeCompare(b.site)||a.title.localeCompare(b.title,"fr")||ts(b)-ts(a);
 const ts=l=>l.ts||parseInt(l.id,36)||0;
 
-let sharedIds=new Set();
-async function loadShared(){ // lineups publiées dans le dépôt (lineups.json), communes à tous les appareils
+async function loadShared(){
+ const ok=d=>Array.isArray(d)?d.filter(x=>x&&x.id&&TYPES.includes(x.type)&&Array.isArray(x.agents)).map(norm):[];
+ if(ghCfg()){try{return ok((await ghRead()).list)}catch(_){}}
  const get=async o=>{const r=await fetch("lineups.json",o);if(!r.ok)throw 0;return r.json()};
- let d;try{d=await get({cache:"no-cache"})}catch(_){try{d=await get({cache:"force-cache"})}catch(__){return[]}}
- return Array.isArray(d)?d.filter(x=>x&&x.id&&TYPES.includes(x.type)&&Array.isArray(x.agents)).map(norm):[];
+ try{return ok(await get({cache:"no-cache"}))}catch(_){try{return ok(await get({cache:"force-cache"}))}catch(__){return[]}}
 }
+let lastInit=0;
 async function init(){
+ lastInit=Date.now();
  let loc=[];
  try{
   loc=await tx("readonly",s=>s.getAll());
@@ -30,10 +34,12 @@ async function init(){
   for(const l of old)if(!loc.some(x=>x.id===l.id)){norm(l);if(await persist(l))loc.push(l)}
   if(old.length)localStorage.removeItem("valo_lineups");
  }catch(e){warn("Stockage indisponible : les modifications ne seront pas conservées après fermeture.")}
- const shared=await loadShared();sharedIds=new Set(shared.map(x=>x.id));
- const ids=new Set(loc.map(x=>x.id));
- data=shared.filter(x=>!ids.has(x.id)).concat(loc.filter(x=>!x.deleted).map(norm)); // la version locale prime sur celle du dépôt
+ const shared=await loadShared();
+ const sh=new Map(shared.map(x=>[x.id,x])),ids=new Set(loc.map(x=>x.id));
+ // le dépôt fait foi pour ce qui est déjà synchronisé ; une vidéo locale est conservée
+ data=shared.filter(x=>!ids.has(x.id)).concat(loc.filter(x=>!x.deleted).map(r=>norm(r.synced!==undefined&&r.synced===r.rev&&sh.has(r.id)?{...sh.get(r.id),video:r.video}:r)));
  render();
+ if(ghCfg()&&loc.some(isPend))schedSync();
 }
 
 opts($("fType"),TYPES,"Type : tous");opts($("fAgent"),AGENTS,"Agent : tous");
@@ -60,7 +66,7 @@ function render(){
 
 const vurls=new Map(); // aperçu des vidéos : fichier local (stocké dans le navigateur) ou lien .mp4
 const isMp4=u=>/\.mp4(\?.*)?$/i.test(u||"");
-const vsrc=l=>{if(l.video instanceof Blob){const o=vurls.get(l.id);if(!o||o.b!==l.video)vurls.set(l.id,{b:l.video,u:URL.createObjectURL(l.video)});return vurls.get(l.id).u}return isMp4(l.link)?l.link:null};
+const vsrc=l=>{if(l.video instanceof Blob){const o=vurls.get(l.id);if(!o||o.b!==l.video)vurls.set(l.id,{b:l.video,u:URL.createObjectURL(l.video)});return vurls.get(l.id).u}return l.videoPath?l.videoPath:isMp4(l.link)?l.link:null};
 function card(l,big){
  const c=el("div","card"+(big?" big":""));const st=el("div","stripe");l.agents.forEach(a=>{const x=el("span");x.style.background=AGENT_COLORS[a];st.appendChild(x)});c.appendChild(st);
  c.appendChild(el("h4",null,l.title));
@@ -80,7 +86,7 @@ function card(l,big){
  if(/^https?:\/\//i.test(l.link||"")&&!isMp4(l.link)){const a=el("a",null,"Voir la vidéo / le lien");a.href=l.link;a.target="_blank";a.rel="noopener";a.onclick=e=>e.stopPropagation();c.appendChild(a)}
  const act=el("div","act");
  const e=el("button",null,"Modifier");e.onclick=ev=>{ev.stopPropagation();closeDetail();openForm(l)};
- const d=el("button",null,"Supprimer");d.onclick=async ev=>{ev.stopPropagation();if(confirm("Supprimer cette lineup ?")){closeDetail();data=data.filter(x=>x.id!==l.id);try{await tx("readwrite",s=>sharedIds.has(l.id)?s.put({id:l.id,deleted:true}):s.delete(l.id))}catch(_){}render()}};
+ const d=el("button",null,"Supprimer");d.onclick=async ev=>{ev.stopPropagation();if(confirm("Supprimer cette lineup ?")){closeDetail();data=data.filter(x=>x.id!==l.id);try{await tx("readwrite",s=>s.put({id:l.id,deleted:true,rev:newRev()}))}catch(_){}render();schedSync()}};
  act.append(e,d);c.appendChild(act);
  if(!big)c.onclick=()=>openDetail(l);
  return c;
@@ -132,7 +138,7 @@ $("save").onclick=async()=>{
  const old=data.find(x=>x.id===editId);
  const o={id:editId||Date.now().toString(36),ts:old?ts(old):Date.now(),title,type:getType(),agents,map:$("eMap").value,site:$("eSite").value,jump:$("eJump").checked,speed:$("eSpeed").checked,video:vid,timer,note:$("eNote").value.trim(),link:$("eLink").value.trim(),imgs:imgs.slice()};
  data=editId?data.map(x=>x.id===editId?o:x):[o,...data];
- await persist(o);
+ await persist(o);schedSync();
  $("dlg").close();
  if(!editId){["fType","fAgent","fMap","fSite"].forEach(i=>$(i).value="");$("q").value="";window.scrollTo(0,0)} // la nouvelle lineup reste visible malgré les filtres
  render();
@@ -142,14 +148,94 @@ $("save").onclick=async()=>{
 ["fType","fAgent","fMap","fSite"].forEach(i=>$(i).onchange=render);
 $("q").oninput=render;
 $("rst").onclick=()=>{["fType","fAgent","fMap","fSite"].forEach(i=>$(i).value="");$("q").value="";render()};
-$("exp").onclick=()=>{if(data.some(l=>l.video))alert("Les vidéos importées depuis cet appareil ne sont pas incluses dans l'export. Pour les partager, mets le .mp4 dans le dossier videos/ du dépôt et écris son chemin (videos/nom.mp4) dans le champ Lien.");const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,(k,v)=>v instanceof Blob?undefined:v)],{type:"application/json"}));a.download="lineups.json";a.click()};
+$("exp").onclick=()=>{if(data.some(l=>l.video))alert("Les vidéos importées depuis cet appareil ne sont pas incluses dans l'export. Pour les partager, mets le .mp4 dans le dossier videos/ du dépôt et écris son chemin (videos/nom.mp4) dans le champ Lien.");const a=el("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,(k,v)=>v instanceof Blob||k==="rev"||k==="synced"?undefined:v)],{type:"application/json"}));a.download="lineups.json";a.click()};
 $("imp").onclick=()=>$("impf").click();
 $("impf").onchange=e=>{
  const f=e.target.files[0];if(!f)return;const r=new FileReader();
  r.onload=async()=>{try{const d=JSON.parse(r.result);if(!Array.isArray(d))throw 0;
   const ids=new Set(data.map(x=>x.id));
   for(const x of d)if(x&&x.id&&!ids.has(x.id)&&TYPES.includes(x.type)&&Array.isArray(x.agents)){norm(x);data.push(x);await persist(x)}
-  render()}catch(_){alert("Fichier invalide.")}};
+  render();schedSync()}catch(_){alert("Fichier invalide.")}};
  r.readAsText(f);e.target.value="";
 };
+
+/* Synchronisation GitHub : chaque modification est enregistrée dans lineups.json du dépôt */
+const ghCfg=()=>{try{return JSON.parse(localStorage.getItem("lineupoteque_gh")||"null")}catch(_){return null}};
+const ghSet=s=>{$("sync").textContent=s};
+const gh=(path,opt={})=>{const c=ghCfg();return fetch("https://api.github.com/repos/"+c.repo+path,{...opt,headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28"}})};
+const b64=s=>{const b=new TextEncoder().encode(s);let o="";for(let i=0;i<b.length;i+=0x8000)o+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));return btoa(o)};
+const unb64=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,"")),c=>c.charCodeAt(0)));
+const blobB64=b=>new Promise((res,rej)=>{const f=new FileReader();f.onload=()=>res(f.result.split(",")[1]);f.onerror=rej;f.readAsDataURL(b)});
+async function ghRead(){
+ const c=ghCfg(),r=await gh("/contents/lineups.json?ref="+encodeURIComponent(c.branch));
+ if(r.status===404)return{list:[],sha:null};
+ if(!r.ok)throw new Error("GitHub "+r.status);
+ const m=await r.json();let t=m.content&&m.encoding==="base64"?unb64(m.content):"";
+ if(!t){const b=await gh("/git/blobs/"+m.sha);if(!b.ok)throw new Error("GitHub "+b.status);t=unb64((await b.json()).content)}
+ let list=[];try{const d=JSON.parse(t);if(Array.isArray(d))list=d}catch(_){}
+ return{list,sha:m.sha};
+}
+async function ghPut(path,content,msg,sha){
+ const c=ghCfg();
+ if(sha===undefined){const g=await gh("/contents/"+path+"?ref="+encodeURIComponent(c.branch));sha=g.ok?(await g.json()).sha:null}
+ const body={message:msg,content,branch:c.branch};if(sha)body.sha=sha;
+ return gh("/contents/"+path,{method:"PUT",body:JSON.stringify(body)});
+}
+let syncT=null,syncing=false,again=false;
+function schedSync(){if(!ghCfg())return;ghSet("Modifications en attente…");clearTimeout(syncT);syncT=setTimeout(runSync,1500)}
+async function runSync(){
+ if(!ghCfg())return;
+ if(syncing){again=true;return}
+ syncing=true;again=false;ghSet("Synchronisation…");
+ try{
+  let done=false;
+  for(let n=0;n<3&&!done;n++){
+   const pend=(await tx("readonly",s=>s.getAll())).filter(isPend);
+   const snap=new Map(pend.map(r=>[r.id,String(r.rev)]));
+   for(const r of pend)if(!r.deleted&&r.video instanceof Blob&&!r.videoPath){ // vidéo : envoyée dans videos/
+    if(r.video.size>25*1048576){warn("Vidéo trop lourde pour l'envoi automatique (25 Mo max) : "+r.title);continue}
+    const p="videos/"+r.id+".mp4",res=await ghPut(p,await blobB64(r.video),"Vidéo : "+r.title);
+    if(!res.ok)throw new Error("GitHub "+res.status+" (vidéo)");
+    r.videoPath=p;const cur=await tx("readonly",s=>s.get(r.id));
+    if(cur&&String(cur.rev)===String(r.rev)){cur.videoPath=p;await tx("readwrite",s=>s.put(cur))}
+   }
+   const {list,sha}=await ghRead();
+   const del=new Set(pend.filter(r=>r.deleted).map(r=>r.id));
+   const map=new Map(list.filter(x=>x&&x.id&&!del.has(x.id)).map(x=>[x.id,x]));
+   pend.filter(r=>!r.deleted).forEach(r=>{const {video,synced,rev,...rest}=r;map.set(r.id,rest)});
+   const txt=JSON.stringify([...map.values()]);
+   if(txt!==JSON.stringify(list)){
+    const res=await ghPut("lineups.json",b64(txt),"Mise à jour des lineups",sha);
+    if(res.status===409||res.status===422)continue; // modifié entre-temps ailleurs : on relit et on refusionne
+    if(!res.ok)throw new Error("GitHub "+res.status);
+   }
+   for(const [id,rev] of snap){
+    const cur=await tx("readonly",s=>s.get(id));
+    if(!cur||String(cur.rev)!==rev)continue; // modifié pendant l'envoi : sera repris au prochain passage
+    if(cur.deleted||!(cur.video instanceof Blob))await tx("readwrite",s=>s.delete(id));
+    else{cur.synced=cur.rev;await tx("readwrite",s=>s.put(cur))}
+   }
+   done=true;
+  }
+  if(!done)throw new Error("conflit répété");
+  ghSet("Synchronisé avec GitHub");warn("");
+ }catch(e){ghSet("Échec de la synchronisation ("+e.message+"), nouvel essai à la prochaine modification")}
+ syncing=false;if(again)schedSync();
+}
+$("gh").onclick=()=>{const c=ghCfg()||{repo:"Ylianlacasse/Lineupoteque",branch:"main",token:""};$("ghRepo").value=c.repo;$("ghBranch").value=c.branch;$("ghTok").value=c.token;$("ghErr").textContent="";$("dgh").showModal()};
+$("ghCancel").onclick=()=>$("dgh").close();
+$("ghOff").onclick=()=>{localStorage.removeItem("lineupoteque_gh");ghSet("GitHub : non connecté");$("dgh").close()};
+$("ghOn").onclick=async()=>{
+ const c={repo:$("ghRepo").value.trim(),branch:$("ghBranch").value.trim()||"main",token:$("ghTok").value.trim()};
+ if(!/^[\w.-]+\/[\w.-]+$/.test(c.repo)||!c.token){$("ghErr").textContent="Renseigne le dépôt (utilisateur/nom) et le token.";return}
+ localStorage.setItem("lineupoteque_gh",JSON.stringify(c));
+ try{
+  const r=await gh("");
+  if(!r.ok)throw new Error(r.status===401?"token refusé":r.status===404?"dépôt introuvable ou accès refusé":"erreur "+r.status);
+  const j=await r.json();if(j.permissions&&j.permissions.push===false)throw new Error("le token n'a pas le droit d'écrire (Contents : Read and write)");
+  $("dgh").close();await runSync();await init();
+ }catch(e){localStorage.removeItem("lineupoteque_gh");$("ghErr").textContent="Échec : "+e.message}
+};
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&ghCfg()&&!syncing&&Date.now()-lastInit>60000)init()});
+ghSet(ghCfg()?"Synchronisation GitHub activée":"GitHub : non connecté");
 init();

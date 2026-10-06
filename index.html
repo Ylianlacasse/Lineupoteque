@@ -2,7 +2,7 @@
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Lineups Valorant</title>
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head><body>
 <h1>Lineups Valorant</h1>
 
@@ -15,6 +15,7 @@
  <button class="p" id="add">+ Ajouter une lineup</button>
  <button id="exp">Exporter</button>
  <button id="imp">Importer</button>
+ <button id="gh">GitHub</button><span id="sync" class="n"></span>
  <button id="rst">Réinitialiser filtres</button>
  <input type="file" id="impf" accept=".json" hidden>
 </div>
@@ -23,6 +24,15 @@
 <div id="dv" hidden><div class="dvin"><div class="dvbar"><button id="dvx" type="button">Fermer</button></div><div id="dvc"></div></div></div>
 <div id="lb" hidden><img alt=""></div>
 
+<dialog id="dgh"><div>
+ <p class="n">Chaque modification est enregistrée automatiquement dans le fichier lineups.json de ton dépôt. Le token reste uniquement dans ce navigateur : à saisir une fois sur chaque appareil.</p>
+ <label>Dépôt</label><input id="ghRepo">
+ <label>Branche</label><input id="ghBranch">
+ <label>Token GitHub</label><input id="ghTok" type="password" autocomplete="off">
+ <p class="n">Créer le token : GitHub › Settings › Developer settings › Personal access tokens › Fine-grained tokens. Accès limité au dépôt Lineupoteque, permission « Contents : Read and write ».</p>
+ <div id="ghErr" class="err"></div>
+ <div class="row"><button class="p" id="ghOn">Connecter</button><button id="ghOff">Déconnecter</button><button id="ghCancel">Fermer</button></div>
+</div></dialog>
 <dialog id="dlg"><div>
  <label>Titre</label><input id="fTitle" maxlength="80" placeholder="ex : Molly depuis le spawn vers Heaven">
  <label>Type</label><div class="chips" id="eType"></div>
@@ -42,6 +52,6 @@
  <div id="err" class="err"></div>
  <div class="row"><button class="p" id="save">Enregistrer</button><button id="cancel">Annuler</button></div>
 </div></dialog>
-<script src="data.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="data.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body></html>
